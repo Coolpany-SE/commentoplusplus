@@ -343,7 +343,8 @@ func commentListAll(domain string) ([]comment, map[string]commenter, error) {
 		FROM comments
 		WHERE
 		canon(comments.domain) LIKE canon($1) AND deleted = false AND 
-			( state = 'approved'  );
+			( state = 'approved'  )
+		ORDER BY creationDate DESC;
 	`
 
 	var rows *sql.Rows
