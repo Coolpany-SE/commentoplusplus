@@ -1,6 +1,7 @@
 package main
 
 import (
+	"strings"
 	"database/sql"
 	"net/http"
 )
@@ -323,12 +324,14 @@ func commentListApprovalsHandler(w http.ResponseWriter, r *http.Request) {
 
 }
 
-func commentListAll(domain string) ([]comment, map[string]commenter, error) {
+func commentListAll(domain string, includeDeleted bool, includeUnapproved bool) ([]comment, map[string]commenter, error) {
 	if domain == "" {
 		return nil, nil, errorMissingField
 	}
 
-	statement := `
+	var sb strings.Builder
+
+	sb.WriteString(`
 		SELECT
 			path,
 			commentHex,
@@ -342,10 +345,20 @@ func commentListAll(domain string) ([]comment, map[string]commenter, error) {
 			creationDate
 		FROM comments
 		WHERE
-		canon(comments.domain) LIKE canon($1) AND deleted = false AND 
-			( state = 'approved'  )
-		ORDER BY creationDate DESC;
-	`
+		canon(comments.domain) LIKE canon($1) 
+	`)
+
+	if !includeDeleted {
+		sb.WriteString("AND deleted = false ")
+	}
+
+	if !includeUnapproved {
+		sb.WriteString("AND ( state = 'approved'  ) ")
+	}
+
+	sb.WriteString("ORDER BY creationDate DESC;")
+
+	statement := sb.String()
 
 	var rows *sql.Rows
 	var err error
@@ -396,6 +409,8 @@ func commentListAllHandler(w http.ResponseWriter, r *http.Request) {
 	type request struct {
 		OwnerToken *string `json:"ownerToken"`
 		Domain     *string `json:"domain"`
+		IncludeDeleted    *bool `json:"includeDeleted"`
+		IncludeUnapproved *bool `json:"includeUnapproved"`
 	}
 
 	var x request
@@ -422,7 +437,7 @@ func commentListAllHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	comments, commenters, err := commentListAll(domain)
+	comments, commenters, err := commentListAll(domain, *x.IncludeDeleted, *x.IncludeUnapproved)
 	if err != nil {
 		bodyMarshal(w, response{"success": false, "message": err.Error()})
 		return
