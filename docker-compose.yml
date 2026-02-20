@@ -1,14 +1,12 @@
-version: '3'
-
 services:
   server:
     build: .
     ports:
       - 8080:8080
     environment:
-      COMMENTO_ORIGIN: http://commento.example.com:8080
-      COMMENTO_PORT: 8080
-      COMMENTO_POSTGRES: postgres://postgres:postgres@db:5432/commento?sslmode=disable
+      COMMENTO_ORIGIN: ${COMMENTO_ORIGIN:-http://localhost:8080}
+      COMMENTO_PORT: ${COMMENTO_PORT:-8080}
+      COMMENTO_POSTGRES: ${COMMENTO_POSTGRES:-postgres://postgres:postgres@db:5432/commento?sslmode=disable}
     depends_on:
       - db
     networks:
@@ -16,9 +14,9 @@ services:
   db:
     image: postgres:12
     environment:
-      POSTGRES_DB: commento
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: ${POSTGRES_DB:-commento}
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
     networks:
       - db_network
     volumes:
