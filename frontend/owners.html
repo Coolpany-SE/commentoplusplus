@@ -1,0 +1,151 @@
+<html>
+  <head>
+    <script src="[[[.CdnPrefix]]]/js/jquery.js"></script>
+    <script src="[[[.CdnPrefix]]]/js/vue.js"></script>
+    <script src="[[[.CdnPrefix]]]/js/owners.js"></script>
+    <link rel="icon" href="[[[.CdnPrefix]]]/images/120x120.png">
+    <link rel="stylesheet" href="[[[.CdnPrefix]]]/css/dashboard.css">
+    <title>Commento: Manage Owners</title>
+  </head>
+
+  <div id="navbar" class="navbar">
+    <a href="[[[.Origin]]]/" class="navbar-item navbar-logo-text"><img src="[[[.CdnPrefix]]]/images/logo.svg" class="navbar-logo">Commento</a>
+    <div class="navbar-item">
+      <a href="[[[.Origin]]]/dashboard" class="navbar-item">Dashboard</a>
+      <a href="[[[.Origin]]]/settings" class="navbar-item">Settings</a>
+      <a href="[[[.Origin]]]/logout" class="navbar-item">Logout</a>
+      <div class="float-right"><b><div id="owner-name"></div></b></div>
+    </div>
+  </div>
+
+  <script>
+  window.onload = function() {
+    window.commento.selfGet(function() {
+      window.commento.vueConstruct(function() {
+        $("#owner-name").text(window.commento.owner.name);
+        window.commento.settingShow("owners-list");
+        window.commento.ownersRefresh();
+      });
+    });
+  };
+  </script>
+
+  <div class="global-error" id="global-error"></div>
+  <div class="global-ok" id="global-ok"></div>
+
+  <div id="owners" class="dashboard-container">
+    <div class="pane-left">
+      <div class="pane-setting selected" id="owners-list" onclick="window.commento.settingShow('owners-list')">
+        <div class="pane-setting-inside">
+          <div class="setting-title">All Owners</div>
+          <div class="setting-subtitle">View and manage admin accounts</div>
+        </div>
+      </div>
+      <div class="pane-setting" id="new-owner" onclick="document.location.hash='#new-owner-modal'">
+        <div class="pane-setting-inside super-setting">
+          <div class="super-setting-title">+</div>
+          <div class="super-setting-text">New Owner</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="pane-right pane-right-lefter">
+      <div id="owners-list-view" class="view hidden">
+        <div class="view-inside">
+          <div class="mid-view">
+            <div class="center center-title">
+              Owner Accounts
+            </div>
+
+            <div class="normal-text">
+              Manage admin accounts that can access this Commento instance.
+            </div>
+
+            <table class="owners-table" v-if="owners.length > 0">
+              <thead>
+                <tr>
+                  <th>Name</th>
+                  <th>Email</th>
+                  <th>Joined</th>
+                  <th>Email Confirmed</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="owner in owners">
+                  <td>{{owner.name}}</td>
+                  <td>{{owner.email}}</td>
+                  <td>{{owner.joinDate}}</td>
+                  <td>{{owner.confirmedEmail ? 'Yes' : 'No'}}</td>
+                  <td>
+                    <button class="button small-button" v-on:click="window.commento.ownerEditOpen(owner.ownerHex)">Edit</button>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+
+            <div class="no-owners" v-if="owners.length === 0">
+              <p>No owners found.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="edit-owner-modal" class="modal-window">
+    <div class="inside">
+      <a href="#modal-close" title="Close" class="modal-close"></a>
+      <div class="modal-title">Edit Owner</div>
+      <div class="modal-contents">
+        <div class="box">
+          <div class="row">
+            <div class="label">Name</div>
+            <input class="input gray-input" id="edit-owner-name" type="text" placeholder="Name">
+          </div>
+          <div class="row">
+            <div class="label">Email</div>
+            <input class="input gray-input" id="edit-owner-email" type="email" placeholder="Email">
+          </div>
+          <div class="row no-border commento-round-check">
+            <input type="checkbox" id="edit-owner-confirmed-email">
+            <label for="edit-owner-confirmed-email">Email Confirmed</label>
+          </div>
+        </div>
+        <div class="center">
+          <button id="save-owner-button" onclick="window.commento.ownerEditHandler()" class="button">Save Changes</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="new-owner-modal" class="modal-window">
+    <div class="inside">
+      <a href="#modal-close" title="Close" class="modal-close"></a>
+      <div class="modal-title">Create New Owner</div>
+      <div class="modal-subtitle">
+        Create a new admin account. This works even if new registrations are disabled.
+      </div>
+      <div class="modal-contents">
+        <div class="box">
+          <div class="row">
+            <div class="label">Name</div>
+            <input class="input gray-input" id="new-owner-name" type="text" placeholder="Name">
+          </div>
+          <div class="row">
+            <div class="label">Email</div>
+            <input class="input gray-input" id="new-owner-email" type="email" placeholder="Email">
+          </div>
+          <div class="row">
+            <div class="label">Password</div>
+            <input class="input gray-input" id="new-owner-password" type="password" placeholder="Password">
+          </div>
+        </div>
+        <div class="center">
+          <button id="create-owner-button" onclick="window.commento.ownerNewHandler()" class="button">Create Owner</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</html>
