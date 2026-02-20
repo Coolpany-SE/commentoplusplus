@@ -12,7 +12,7 @@ func TestOwnerLoginBasics(t *testing.T) {
 		return
 	}
 
-	ownerNew("test@example.com", "Test", "hunter2")
+	ownerNew("test@example.com", "Test", "hunter2", false)
 
 	if _, err := ownerLogin("test@example.com", "hunter2"); err != nil {
 		t.Errorf("unexpected error when logging in: %v", err)
@@ -38,7 +38,7 @@ func TestOwnerLoginEmpty(t *testing.T) {
 		return
 	}
 
-	ownerNew("test@example.com", "Test", "hunter2")
+	ownerNew("test@example.com", "Test", "hunter2", false)
 
 	if _, err := ownerLogin("test@example.com", ""); err == nil {
 		t.Errorf("expected error not found when passing empty password")
