@@ -12,6 +12,10 @@ type response map[string]interface{}
 // TODO: Add tests in utils_http_test.go
 
 func bodyUnmarshal(r *http.Request, x interface{}) error {
+	return bodyUnmarshalOptionalFields(r, x, []string{})
+}
+
+func bodyUnmarshalOptionalFields(r *http.Request, x interface{}, optionalFields []string) error {
 	b, err := ioutil.ReadAll(r.Body)
 	if err != nil {
 		logger.Errorf("cannot read POST body: %v\n", err)
@@ -22,9 +26,17 @@ func bodyUnmarshal(r *http.Request, x interface{}) error {
 		return errorInvalidJSONBody
 	}
 
+	// Create a set of optional field names for quick lookup
+	optional := make(map[string]bool)
+	for _, field := range optionalFields {
+		optional[field] = true
+	}
+
 	xv := reflect.Indirect(reflect.ValueOf(x))
+	xt := xv.Type()
 	for i := 0; i < xv.NumField(); i++ {
-		if xv.Field(i).IsNil() {
+		fieldName := xt.Field(i).Name
+		if xv.Field(i).IsNil() && !optional[fieldName] {
 			return errorMissingField
 		}
 	}

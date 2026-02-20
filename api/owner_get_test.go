@@ -7,7 +7,7 @@ import (
 func TestOwnerGetByEmailBasics(t *testing.T) {
 	failTestOnError(t, setupTestEnv())
 
-	ownerHex, _ := ownerNew("test@example.com", "Test", "hunter2")
+	ownerHex, _ := ownerNew("test@example.com", "Test", "hunter2", false)
 
 	o, err := ownerGetByEmail("test@example.com")
 	if err != nil {
@@ -33,7 +33,7 @@ func TestOwnerGetByEmailDNE(t *testing.T) {
 func TestOwnerGetByOwnerTokenBasics(t *testing.T) {
 	failTestOnError(t, setupTestEnv())
 
-	ownerHex, _ := ownerNew("test@example.com", "Test", "hunter2")
+	ownerHex, _ := ownerNew("test@example.com", "Test", "hunter2", false)
 
 	ownerToken, _ := ownerLogin("test@example.com", "hunter2")
 
