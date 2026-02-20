@@ -28,6 +28,9 @@ DB_DEVEL_ROOT_DIR         = $(DEVEL_BUILD_DIR)/db
 DB_PROD_BUILD_DIR         = $(DB_BUILD_DIR)/$(PROD_BUILD_DIR)
 DB_PROD_ROOT_DIR          = $(PROD_BUILD_DIR)/db
 
+IMAGE_NAME ?= commentoplusplus
+TAG=$(shell git rev-parse --abbrev-ref HEAD)-$(shell git rev-parse --short HEAD)-$(shell git rev-list --count HEAD)
+
 devel: devel-frontend devel-api devel-templates devel-db
 
 prod: prod-frontend prod-api prod-templates prod-db
@@ -94,5 +97,8 @@ clean-templates:
 
 clean-db:
 	cd db && $(MAKE) $(MAKECMDGOALS)
+
+docker: 
+	docker build . -f Dockerfile -t $(IMAGE_NAME):$(TAG)
 
 $(shell mkdir -p $(FRONTEND_DEVEL_ROOT_DIR) $(API_DEVEL_ROOT_DIR) $(TEMPLATES_DEVEL_ROOT_DIR) $(FRONTEND_PROD_ROOT_DIR) $(API_PROD_ROOT_DIR) $(TEMPLATES_DEVEL_ROOT_DIR))
