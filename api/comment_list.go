@@ -2,6 +2,7 @@ package main
 
 import (
 	"database/sql"
+	"fmt"
 	"net/http"
 	"strings"
 )
@@ -329,9 +330,9 @@ type CommentListAllOptions struct {
 	IncludeUnapproved bool `json:"includeUnapproved"`
 }
 
-func commentListAll(domain string, options CommentListAllOptions) ([]comment, map[string]commenter, error) {
+func commentListAll(domain string, pagination PaginationRequest, options CommentListAllOptions) ([]comment, map[string]commenter, int, error) {
 	if domain == "" {
-		return nil, nil, errorMissingField
+		return nil, nil, 0, errorMissingField
 	}
 
 	args := []interface{}{domain}
@@ -351,18 +352,38 @@ func commentListAll(domain string, options CommentListAllOptions) ([]comment, ma
 			deleted,
 			creationDate
 		FROM comments
-		WHERE canon(comments.domain) LIKE canon($1)
+		WHERE 
 	`)
 
+	var where strings.Builder
+
+	where.WriteString("canon(comments.domain) LIKE canon($1)")
+
 	if !options.IncludeDeleted {
-		query.WriteString("AND deleted = false ")
+		where.WriteString("AND deleted = false ")
 	}
 
 	if !options.IncludeUnapproved {
-		query.WriteString("AND ( state = 'approved'  ) ")
+		where.WriteString("AND ( state = 'approved'  ) ")
+	}
+
+	query.WriteString(where.String())
+
+	// Build count query with the same WHERE clause
+	countQuery := fmt.Sprintf("SELECT COUNT(*) FROM comments WHERE %s", where.String())
+
+	var count int
+	countErr := db.QueryRow(countQuery, args...).Scan(&count)
+	if countErr != nil {
+		logger.Errorf("cannot count comments: %v", countErr)
+		return nil, nil, 0, errorInternal
 	}
 
 	query.WriteString("ORDER BY creationDate DESC ")
+
+	// This needs to be done after the count query, as it adds pagination args to the args slice,
+	// which are not used in the count query and would interfere with it.
+	pagination.PaginateQuery(&query, &args)
 
 	query.WriteString(";")
 
@@ -373,7 +394,7 @@ func commentListAll(domain string, options CommentListAllOptions) ([]comment, ma
 
 	if err != nil {
 		logger.Errorf("cannot get comments: %v", err)
-		return nil, nil, errorInternal
+		return nil, nil, 0, errorInternal
 	}
 	defer rows.Close()
 
@@ -401,7 +422,7 @@ func commentListAll(domain string, options CommentListAllOptions) ([]comment, ma
 			&c.State,
 			&c.Deleted,
 			&c.CreationDate); err != nil {
-			return nil, nil, errorInternal
+			return nil, nil, 0, errorInternal
 		}
 
 		comments = append(comments, c)
@@ -410,12 +431,12 @@ func commentListAll(domain string, options CommentListAllOptions) ([]comment, ma
 			commenters[c.CommenterHex], err = commenterGetByHex(c.CommenterHex)
 			if err != nil {
 				logger.Errorf("cannot retrieve commenter: %v", err)
-				return nil, nil, errorInternal
+				return nil, nil, 0, errorInternal
 			}
 		}
 	}
 
-	return comments, commenters, nil
+	return comments, commenters, count, nil
 }
 
 func commentListAllHandler(w http.ResponseWriter, r *http.Request) {
@@ -423,6 +444,8 @@ func commentListAllHandler(w http.ResponseWriter, r *http.Request) {
 		OwnerToken *string `json:"ownerToken"`
 		Domain     *string `json:"domain"`
 	}
+
+	pagination, err := CreatePaginationRequestFromBody(r)
 
 	var options CommentListAllOptions
 	bodyUnmarshalOptional(r, &options)
@@ -451,7 +474,7 @@ func commentListAllHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	comments, commenters, err := commentListAll(domain, options)
+	comments, commenters, count, err := commentListAll(domain, pagination, options)
 	if err != nil {
 		bodyMarshal(w, response{"success": false, "message": err.Error()})
 		return
@@ -468,6 +491,7 @@ func commentListAllHandler(w http.ResponseWriter, r *http.Request) {
 		"domain":     domain,
 		"comments":   comments,
 		"commenters": _commenters,
+		"pagination": pagination.CreateResponse(&count),
 	})
 
 }
