@@ -326,8 +326,9 @@ func commentListApprovalsHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 type CommentListAllOptions struct {
-	IncludeDeleted    bool `json:"includeDeleted"`
-	IncludeUnapproved bool `json:"includeUnapproved"`
+	IncludeDeleted    bool   `json:"includeDeleted"`
+	IncludeUnapproved bool   `json:"includeUnapproved"`
+	Search            string `json:"search"`
 }
 
 func commentListAll(domain string, pagination *PaginationRequest, options CommentListAllOptions) ([]comment, map[string]commenter, int, error) {
@@ -365,6 +366,14 @@ func commentListAll(domain string, pagination *PaginationRequest, options Commen
 
 	if !options.IncludeUnapproved {
 		where.WriteString("AND ( state = 'approved'  ) ")
+	}
+
+	search := strings.TrimSpace(options.Search)
+
+	if len(search) > 0 {
+		searchArgIndex := fmt.Sprintf("$%d", len(args)+1)
+		where.WriteString(fmt.Sprintf("AND (markdown ILIKE %s OR html ILIKE %s OR path ILIKE %s) ", searchArgIndex, searchArgIndex, searchArgIndex))
+		args = append(args, "%"+search+"%")
 	}
 
 	query.WriteString(where.String())
