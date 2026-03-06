@@ -414,7 +414,7 @@ func commentListAllHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var x request
-	if err := bodyUnmarshalOptionalFields(r, &x, []string{"IncludeDeleted", "IncludeUnapproved"}); err != nil {
+	if err := bodyUnmarshalOptionalFields(r, &x, true, []string{"IncludeDeleted", "IncludeUnapproved"}); err != nil {
 		bodyMarshal(w, response{"success": false, "message": err.Error()})
 		return
 	}

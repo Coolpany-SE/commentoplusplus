@@ -12,10 +12,14 @@ type response map[string]interface{}
 // TODO: Add tests in utils_http_test.go
 
 func bodyUnmarshal(r *http.Request, x interface{}) error {
-	return bodyUnmarshalOptionalFields(r, x, []string{})
+	return bodyUnmarshalOptionalFields(r, x, true, []string{})
 }
 
-func bodyUnmarshalOptionalFields(r *http.Request, x interface{}, optionalFields []string) error {
+func bodyUnmarshalOptional(r *http.Request, x interface{}) error {
+	return bodyUnmarshalOptionalFields(r, x, false, []string{})
+}
+
+func bodyUnmarshalOptionalFields(r *http.Request, x interface{}, required bool, optional []string) error {
 	b, err := io.ReadAll(r.Body)
 	if err != nil {
 		logger.Errorf("cannot read POST body: %v\n", err)
@@ -26,17 +30,19 @@ func bodyUnmarshalOptionalFields(r *http.Request, x interface{}, optionalFields 
 		return errorInvalidJSONBody
 	}
 
-	// Create a set of optional field names for quick lookup
-	optional := make(map[string]bool)
-	for _, field := range optionalFields {
-		optional[field] = true
+	// If fields are required, create a set of provided optional fields for quick lookup
+	optionalFields := make(map[string]bool)
+	if required {
+		for _, field := range optional {
+			optionalFields[field] = true
+		}
 	}
 
 	xv := reflect.Indirect(reflect.ValueOf(x))
 	xt := xv.Type()
 	for i := 0; i < xv.NumField(); i++ {
 		fieldName := xt.Field(i).Name
-		if xv.Field(i).IsNil() && !optional[fieldName] {
+		if required && xv.Field(i).IsNil() && !optionalFields[fieldName] {
 			return errorMissingField
 		}
 	}
