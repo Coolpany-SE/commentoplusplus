@@ -324,14 +324,21 @@ func commentListApprovalsHandler(w http.ResponseWriter, r *http.Request) {
 
 }
 
-func commentListAll(domain string, includeDeleted bool, includeUnapproved bool) ([]comment, map[string]commenter, error) {
+type CommentListAllOptions struct {
+	IncludeDeleted    bool `json:"includeDeleted"`
+	IncludeUnapproved bool `json:"includeUnapproved"`
+}
+
+func commentListAll(domain string, options CommentListAllOptions) ([]comment, map[string]commenter, error) {
 	if domain == "" {
 		return nil, nil, errorMissingField
 	}
 
-	var sb strings.Builder
+	args := []interface{}{domain}
 
-	sb.WriteString(`
+	var query strings.Builder
+
+	query.WriteString(`
 		SELECT
 			path,
 			commentHex,
@@ -344,26 +351,25 @@ func commentListAll(domain string, includeDeleted bool, includeUnapproved bool) 
 			deleted,
 			creationDate
 		FROM comments
-		WHERE
-		canon(comments.domain) LIKE canon($1) 
+		WHERE canon(comments.domain) LIKE canon($1)
 	`)
 
-	if !includeDeleted {
-		sb.WriteString("AND deleted = false ")
+	if !options.IncludeDeleted {
+		query.WriteString("AND deleted = false ")
 	}
 
-	if !includeUnapproved {
-		sb.WriteString("AND ( state = 'approved'  ) ")
+	if !options.IncludeUnapproved {
+		query.WriteString("AND ( state = 'approved'  ) ")
 	}
 
-	sb.WriteString("ORDER BY creationDate DESC;")
+	query.WriteString("ORDER BY creationDate DESC ")
 
-	statement := sb.String()
+	query.WriteString(";")
 
 	var rows *sql.Rows
 	var err error
 
-	rows, err = db.Query(statement, domain)
+	rows, err = db.Query(query.String(), args...)
 
 	if err != nil {
 		logger.Errorf("cannot get comments: %v", err)
@@ -372,7 +378,14 @@ func commentListAll(domain string, includeDeleted bool, includeUnapproved bool) 
 	defer rows.Close()
 
 	commenters := make(map[string]commenter)
-	commenters["anonymous"] = commenter{CommenterHex: "anonymous", Email: "undefined", Name: "Anonymous", Link: "undefined", Photo: "undefined", Provider: "undefined"}
+	commenters["anonymous"] = commenter{
+		CommenterHex: "anonymous",
+		Email:        "undefined",
+		Name:         "Anonymous",
+		Link:         "undefined",
+		Photo:        "undefined",
+		Provider:     "undefined",
+	}
 
 	comments := []comment{}
 	for rows.Next() {
@@ -407,14 +420,15 @@ func commentListAll(domain string, includeDeleted bool, includeUnapproved bool) 
 
 func commentListAllHandler(w http.ResponseWriter, r *http.Request) {
 	type request struct {
-		OwnerToken        *string `json:"ownerToken"`
-		Domain            *string `json:"domain"`
-		IncludeDeleted    *bool   `json:"includeDeleted"`
-		IncludeUnapproved *bool   `json:"includeUnapproved"`
+		OwnerToken *string `json:"ownerToken"`
+		Domain     *string `json:"domain"`
 	}
 
+	var options CommentListAllOptions
+	bodyUnmarshalOptional(r, &options)
+
 	var x request
-	if err := bodyUnmarshalOptionalFields(r, &x, true, []string{"IncludeDeleted", "IncludeUnapproved"}); err != nil {
+	if err := bodyUnmarshal(r, &x); err != nil {
 		bodyMarshal(w, response{"success": false, "message": err.Error()})
 		return
 	}
@@ -437,17 +451,7 @@ func commentListAllHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	includeDeleted := false
-	if x.IncludeDeleted != nil {
-		includeDeleted = *x.IncludeDeleted
-	}
-
-	includeUnapproved := false
-	if x.IncludeUnapproved != nil {
-		includeUnapproved = *x.IncludeUnapproved
-	}
-
-	comments, commenters, err := commentListAll(domain, includeDeleted, includeUnapproved)
+	comments, commenters, err := commentListAll(domain, options)
 	if err != nil {
 		bodyMarshal(w, response{"success": false, "message": err.Error()})
 		return
