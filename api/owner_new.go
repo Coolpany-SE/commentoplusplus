@@ -1,10 +1,11 @@
 package main
 
 import (
-	"golang.org/x/crypto/bcrypt"
 	"net/http"
 	"os"
 	"time"
+
+	"golang.org/x/crypto/bcrypt"
 )
 
 func ownerNew(email string, name string, password string, createdByOwner bool) (string, error) {
@@ -82,8 +83,14 @@ func ownerNewHandler(w http.ResponseWriter, r *http.Request) {
 		Password   *string `json:"password"`
 	}
 
+	var body, err = bodyRead(r)
+	if err != nil {
+		bodyMarshal(w, response{"success": false, "message": err.Error()})
+		return
+	}
+
 	var x request
-	if err := bodyUnmarshalOptionalFields(r, &x, []string{"OwnerToken"}); err != nil {
+	if err := UnmarshalAndValidateJson(body, &x, true, []string{"OwnerToken"}); err != nil {
 		bodyMarshal(w, response{"success": false, "message": err.Error()})
 		return
 	}
