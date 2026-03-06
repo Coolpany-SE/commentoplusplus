@@ -2,7 +2,7 @@ package main
 
 import (
 	"encoding/json"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"reflect"
 )
@@ -12,7 +12,15 @@ type response map[string]interface{}
 // TODO: Add tests in utils_http_test.go
 
 func bodyUnmarshal(r *http.Request, x interface{}) error {
-	b, err := ioutil.ReadAll(r.Body)
+	return bodyUnmarshalOptionalFields(r, x, true, []string{})
+}
+
+func bodyUnmarshalOptional(r *http.Request, x interface{}) error {
+	return bodyUnmarshalOptionalFields(r, x, false, []string{})
+}
+
+func bodyUnmarshalOptionalFields(r *http.Request, x interface{}, required bool, optional []string) error {
+	b, err := io.ReadAll(r.Body)
 	if err != nil {
 		logger.Errorf("cannot read POST body: %v\n", err)
 		return errorInternal
@@ -22,9 +30,19 @@ func bodyUnmarshal(r *http.Request, x interface{}) error {
 		return errorInvalidJSONBody
 	}
 
+	// If fields are required, create a set of provided optional fields for quick lookup
+	optionalFields := make(map[string]bool)
+	if required {
+		for _, field := range optional {
+			optionalFields[field] = true
+		}
+	}
+
 	xv := reflect.Indirect(reflect.ValueOf(x))
+	xt := xv.Type()
 	for i := 0; i < xv.NumField(); i++ {
-		if xv.Field(i).IsNil() {
+		fieldName := xt.Field(i).Name
+		if required && xv.Field(i).IsNil() && !optionalFields[fieldName] {
 			return errorMissingField
 		}
 	}

@@ -83,6 +83,14 @@ const jsCompileMap = {
     "js/self.js",
     "js/settings.js"
   ],
+  "js/owners.js": [
+    "js/constants.js",
+    "js/utils.js",
+    "js/http.js",
+    "js/errors.js",
+    "js/self.js",
+    "js/owners.js"
+  ],
   "js/logout.js": [
     "js/constants.js",
     "js/utils.js",

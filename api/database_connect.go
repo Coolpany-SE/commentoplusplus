@@ -2,11 +2,12 @@ package main
 
 import (
 	"database/sql"
-	_ "github.com/lib/pq"
 	"net/url"
 	"os"
 	"strconv"
 	"time"
+
+	_ "github.com/lib/pq"
 )
 
 func dbConnect(retriesLeft int) error {
@@ -37,16 +38,7 @@ func dbConnect(retriesLeft int) error {
 		}
 	}
 
-	statement := `
-		CREATE TABLE IF NOT EXISTS migrations (
-			filename TEXT NOT NULL UNIQUE
-		);
-	`
-	_, err = db.Exec(statement)
-	if err != nil {
-		logger.Errorf("cannot create migrations table: %v", err)
-		return err
-	}
+	dbCreateMigrationsTable()
 
 	maxIdleConnections, err := strconv.Atoi(os.Getenv("MAX_IDLE_PG_CONNECTIONS"))
 	if err != nil {
@@ -55,6 +47,22 @@ func dbConnect(retriesLeft int) error {
 	}
 
 	db.SetMaxIdleConns(maxIdleConnections)
+
+	return nil
+}
+
+func dbCreateMigrationsTable() error {
+	statement := `
+		CREATE TABLE IF NOT EXISTS migrations (
+			filename TEXT NOT NULL UNIQUE
+		);
+	`
+	_, err := db.Exec(statement)
+
+	if err != nil {
+		logger.Errorf("cannot create migrations table: %v", err)
+		return err
+	}
 
 	return nil
 }
