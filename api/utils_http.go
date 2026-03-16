@@ -1,47 +1,27 @@
 package main
 
 import (
-	"encoding/json"
-	"io/ioutil"
+	"io"
 	"net/http"
-	"reflect"
 )
 
 type response map[string]interface{}
 
-// TODO: Add tests in utils_http_test.go
-
-func bodyUnmarshal(r *http.Request, x interface{}) error {
-	b, err := ioutil.ReadAll(r.Body)
+func bodyRead(r *http.Request) ([]byte, error) {
+	b, err := io.ReadAll(r.Body)
 	if err != nil {
 		logger.Errorf("cannot read POST body: %v\n", err)
-		return errorInternal
+		return nil, errorInternal
 	}
 
-	if err = json.Unmarshal(b, x); err != nil {
-		return errorInvalidJSONBody
-	}
-
-	xv := reflect.Indirect(reflect.ValueOf(x))
-	for i := 0; i < xv.NumField(); i++ {
-		if xv.Field(i).IsNil() {
-			return errorMissingField
-		}
-	}
-
-	return nil
+	return b, nil
 }
 
 func bodyMarshal(w http.ResponseWriter, x map[string]interface{}) error {
-	resp, err := json.Marshal(x)
-	if err != nil {
-		w.Write([]byte(`{"success":false,"message":"Some internal error occurred"}`))
-		logger.Errorf("cannot marshal response: %v\n")
-		return errorInternal
-	}
-
+	resp, err := MarshalJson(x)
 	w.Write(resp)
-	return nil
+
+	return err
 }
 
 func getIp(r *http.Request) string {
@@ -55,4 +35,24 @@ func getIp(r *http.Request) string {
 
 func getUserAgent(r *http.Request) string {
 	return r.Header.Get("User-Agent")
+}
+
+// Deprecated
+
+func bodyUnmarshal(r *http.Request, x interface{}) error {
+	return bodyUnmarshalRequest(r, x, true, []string{})
+}
+
+func bodyUnmarshalOptional(r *http.Request, x interface{}) error {
+	return bodyUnmarshalRequest(r, x, false, []string{})
+}
+
+func bodyUnmarshalRequest(r *http.Request, x interface{}, required bool, optional []string) error {
+	b, err := io.ReadAll(r.Body)
+	if err != nil {
+		logger.Errorf("cannot read POST body: %v\n", err)
+		return errorInternal
+	}
+
+	return UnmarshalAndValidateJson(b, x, required, optional)
 }

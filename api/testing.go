@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"testing"
+	"time"
 
 	"github.com/op/go-logging"
 )
@@ -42,19 +43,48 @@ func getPublicTables() ([]string, error) {
 	return tables, nil
 }
 
-func dropTables() error {
+func clearDatabase() error {
 	tables, err := getPublicTables()
 	if err != nil {
 		return err
 	}
 
+	// Drop all tables so we always work with the same data.
+	// That includes the `migrations` table` so that all migrations re-run cleanly.
 	for _, table := range tables {
-		if table != "migrations" {
-			_, err = db.Exec(fmt.Sprintf("DROP TABLE %s;", table))
-			if err != nil {
-				fmt.Fprintf(os.Stderr, "cannot drop %s: %v", table, err)
-				return err
-			}
+		_, err = db.Exec(fmt.Sprintf("DROP TABLE %s CASCADE;", table))
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "cannot drop %s: %v", table, err)
+			return err
+		}
+	}
+
+	// Drop any custom enum types so migrations can recreate them
+	statement := `
+		SELECT t.typname
+		FROM pg_type t
+		JOIN pg_namespace n ON t.typnamespace = n.oid
+		WHERE n.nspname = 'public' AND t.typtype = 'e';
+	`
+	rows, err := db.Query(statement)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "cannot query custom types: %v", err)
+		return err
+	}
+
+	defer rows.Close()
+
+	for rows.Next() {
+		var typeName string
+		if err = rows.Scan(&typeName); err != nil {
+			fmt.Fprintf(os.Stderr, "cannot scan type name: %v", err)
+			return err
+		}
+
+		_, err = db.Exec(fmt.Sprintf("DROP TYPE %s CASCADE;", typeName))
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "cannot drop type %s: %v", typeName, err)
+			return err
 		}
 	}
 
@@ -73,9 +103,12 @@ func setupTestDatabase() error {
 		return err
 	}
 
-	if err := dropTables(); err != nil {
+	if err := clearDatabase(); err != nil {
 		return err
 	}
+
+	// Recreate the migrations table since clearDatabase removes it
+	dbCreateMigrationsTable()
 
 	if err := migrateFromDir("../db/"); err != nil {
 		return err
@@ -96,6 +129,20 @@ func clearTables() error {
 			fmt.Fprintf(os.Stderr, "cannot clear %s: %v", table, err)
 			return err
 		}
+	}
+
+	return nil
+}
+
+func createTestOwner() error {
+	statement := `
+		INSERT INTO owners (ownerHex, email, name, passwordHash, confirmedEmail, joinDate)
+		VALUES ($1, $2, $3, $4, $5, $6);
+	`
+	_, err := db.Exec(statement, "temp-owner-hex", "test@test.com", "Test Owner", "dummy-hash", true, time.Now().UTC())
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "cannot create test owner: %v", err)
+		return err
 	}
 
 	return nil
@@ -127,6 +174,10 @@ func setupTestEnv() error {
 	}
 
 	if err := clearTables(); err != nil {
+		return err
+	}
+
+	if err := createTestOwner(); err != nil {
 		return err
 	}
 

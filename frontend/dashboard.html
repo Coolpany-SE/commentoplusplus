@@ -14,6 +14,7 @@
   <div id="navbar" class="navbar">
     <a href="[[[.Origin]]]/" class="navbar-item navbar-logo-text"><img src="[[[.CdnPrefix]]]/images/logo.svg" class="navbar-logo">Commento</a>
     <div class="navbar-item">
+      <a href="[[[.Origin]]]/owners" class="navbar-item">Owners</a>
       <a href="[[[.Origin]]]/settings" class="navbar-item">Settings</a>
       <a href="[[[.Origin]]]/logout" class="navbar-item">Logout</a>
       <div class="float-right"><b><div id="owner-name"></div></b></div>
@@ -160,8 +161,9 @@
                 <ul class="tabs">
                   <li class="tab-link original current" data-tab="mod-tab-1">General</li>
                   <li class="tab-link" data-tab="mod-tab-2">Add/Remove Moderators</li>
-                  <li class="tab-link" data-tab="mod-tab-3">Pending Approvals</li>
-                  <li class="tab-link" data-tab="mod-tab-4">All comments</li>
+                  <li class="tab-link" data-tab="mod-tab-3">Domain Owners</li>
+                  <li class="tab-link" data-tab="mod-tab-4">Pending Approvals</li>
+                  <li class="tab-link" data-tab="mod-tab-5">All comments</li>
                 </ul>
 
                 <div id="mod-tab-1" class="content original current">
@@ -255,8 +257,36 @@
                   </div>
                 </div>
 
-
                 <div id="mod-tab-3" class="content">
+                  <div class="normal-text">
+                    Domain owners have full administrative access to this domain. They can manage settings, moderators, and other owners. Add other owners to allow them to manage this domain from their dashboard.<br><br>
+
+                    Only add trusted users as domain owners, as they will have full control over this domain.
+                  </div>
+                  <div class="commento-email-container" style="flex-direction: column;">
+                    <div class="commento-email">
+                      <input class="commento-input" type="text" id="new-domain-owner" placeholder="Owner Email">
+                      <button id="new-domain-owner-button" class="commento-email-button" onclick="window.commento.domainOwnerAddHandler()">Add owner</button>
+                    </div>
+                    <div class="row no-border commento-round-check" style="margin-top: 10px;">
+                      <input type="checkbox" id="new-domain-owner-add-moderator" checked>
+                      <label for="new-domain-owner-add-moderator">Also add as moderator</label>
+                    </div>
+                  </div>
+                  <hr/>
+                  <div class="mod-emails-container">
+                    <div class="content">
+                      <div class="mod-email" v-for="owner in domains[cd].owners" v-if="domains[cd].owners && domains[cd].owners.length > 0">
+                        <div class="email">{{owner.email}} <span v-if="owner.name">({{owner.name}})</span></div>
+                        <div class="delete" v-on:click="window.commento.domainOwnerRemoveHandler(owner.ownerHex)" v-if="domains[cd].owners.length > 1">Remove</div>
+                        <div class="date">added {{owner.timeAgo}}</div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+
+                <div id="mod-tab-4" class="content">
                   <div class="normal-text">
                     All of the pending comments awaiting moderation across your domain are shown here for convenience.
                   </div>
@@ -282,23 +312,67 @@
                   </div>
                 </div>
 
-                <div id="mod-tab-4" class="content">
-                  <div class="normal-text">
-                    All of the comments across your domain .
+                <div id="mod-tab-5" class="content">
+                  <div class="commento-email-container">
+                    <div class="commento-email">
+                      <input class="commento-input" type="text" id="all-comments-search" placeholder="Search comments..." v-model="domains[cd].allCommentsSearch">
+                      <button class="commento-email-button" onclick="window.commento.allCommentsRefresh()">Search</button>
+                    </div>
                   </div>
+
+                  <div class="all-comments-filters">
+                    <div class="row no-border commento-round-check">
+                      <div class="commento-round-check">
+                        <input type="checkbox" id="all-comments-include-unapproved" v-model="domains[cd].allCommentsIncludeUnapproved" v-on:change="window.commento.allCommentsRefresh()">
+                        <label for="all-comments-include-unapproved">Include unapproved</label>
+                      </div>
+                    </div>
+                    
+                    <div class="row no-border commento-round-check">
+                      <div class="commento-round-check">
+                        <input type="checkbox" id="all-comments-include-deleted" v-model="domains[cd].allCommentsIncludeDeleted" v-on:change="window.commento.allCommentsRefresh()">
+                        <label for="all-comments-include-deleted">Include deleted</label>
+                      </div>
+                    </div>
+                  </div>
+
                   <div class="mod-comments-container">
-                    <div class="content">
+                    <div class="content" v-if="domains[cd].commentsAll && domains[cd].commentsAll.length > 0">
                       <div class="mod-comments-row">
                         <div class="comment"><strong>Path</strong></div>
                         <div class="comment"><strong>Date</strong></div>
                         <div class="comment"><strong>User</strong></div>
                         <div class="comment cccc"><strong>Comment</strong></div>
+                        <div class="comment"><strong>State</strong></div>
+                        <div class="comment"><strong>Tools</strong></div>
                       </div>
-                      <div class="mod-comments-row" v-for="comment in domains[cd].commentsAll" v-if="domains[cd].commentsAll.length > 0">
+                      <div class="mod-comments-row" v-for="comment in domains[cd].commentsAll">
                         <div class="comment"><a :href="'https://' + domains[cd].domain + comment.url">{{ comment.url }}</a></div>
                         <div class="comment">{{ comment.creationDate }}</div>
                         <div class="comment">{{ domains[cd].commentersAll[comment.commenterHex].name }}</div>
                         <div class="comment cccc"><span v-html="comment.html"></span></div>
+                        <div class="comment" style="text-transform: capitalize">{{ comment.deleted ? "deleted" : comment.state }}</div>
+                        <div class="comment"><div class="delete" v-if="!comment.deleted" v-on:click="window.commento.allCommentsDeleteHandler(comment.commentHex)">Delete</button></div>
+                      </div>
+                    </div>
+                    <div style="padding: 12px; color: #888;" v-else>No comments found.</div>
+                  </div>
+                
+
+                  <div class="all-comments-pagination" v-if="domains[cd].allCommentsPagination">
+                    <div class="all-comments-pagination-row">
+                      <div class="all-comments-pagination-info">
+                        Page {{ domains[cd].allCommentsPagination.page }} &middot; {{ domains[cd].allCommentsPagination.count }} total comments
+                      </div>
+                      <div class="all-comments-pagination-controls">
+                        <button class="button pagination-button" v-bind:disabled="domains[cd].allCommentsPagination.page <= 1" v-on:click="window.commento.allCommentsPagePrev()">&laquo; Previous</button>
+                        <select id="all-comments-limit" v-model="domains[cd].allCommentsLimit" v-on:change="window.commento.allCommentsRefresh()">
+                          <option value="25">25 per page</option>
+                          <option value="50">50 per page</option>
+                          <option value="75">75 per page</option>
+                          <option value="100">100 per page</option>
+                        </select>
+                        <button class="button pagination-button" v-bind:disabled="domains[cd].allCommentsPagination.page * domains[cd].allCommentsLimit >= domains[cd].allCommentsPagination.count" v-on:click="window.commento.allCommentsPageNext()">Next &raquo;</button>
                       </div>
                     </div>
                   </div>

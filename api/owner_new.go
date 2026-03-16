@@ -1,18 +1,19 @@
 package main
 
 import (
-	"golang.org/x/crypto/bcrypt"
 	"net/http"
 	"os"
 	"time"
+
+	"golang.org/x/crypto/bcrypt"
 )
 
-func ownerNew(email string, name string, password string) (string, error) {
+func ownerNew(email string, name string, password string, createdByOwner bool) (string, error) {
 	if email == "" || name == "" || password == "" {
 		return "", errorMissingField
 	}
 
-	if os.Getenv("FORBID_NEW_OWNERS") == "true" {
+	if os.Getenv("FORBID_NEW_OWNERS") == "true" && !createdByOwner {
 		return "", errorNewOwnerForbidden
 	}
 
@@ -76,18 +77,35 @@ func ownerNew(email string, name string, password string) (string, error) {
 
 func ownerNewHandler(w http.ResponseWriter, r *http.Request) {
 	type request struct {
-		Email    *string `json:"email"`
-		Name     *string `json:"name"`
-		Password *string `json:"password"`
+		OwnerToken *string `json:"ownerToken"`
+		Email      *string `json:"email"`
+		Name       *string `json:"name"`
+		Password   *string `json:"password"`
 	}
 
-	var x request
-	if err := bodyUnmarshal(r, &x); err != nil {
+	var body, err = bodyRead(r)
+	if err != nil {
 		bodyMarshal(w, response{"success": false, "message": err.Error()})
 		return
 	}
 
-	if _, err := ownerNew(*x.Email, *x.Name, *x.Password); err != nil {
+	var x request
+	if err := UnmarshalAndValidateJson(body, &x, true, []string{"OwnerToken"}); err != nil {
+		bodyMarshal(w, response{"success": false, "message": err.Error()})
+		return
+	}
+
+	// Check if an existing owner is making this request
+	createdByOwner := false
+	if x.OwnerToken != nil && *x.OwnerToken != "" {
+		if _, err := ownerGetByOwnerToken(*x.OwnerToken); err != nil {
+			bodyMarshal(w, response{"success": false, "message": err.Error()})
+			return
+		}
+		createdByOwner = true
+	}
+
+	if _, err := ownerNew(*x.Email, *x.Name, *x.Password, createdByOwner); err != nil {
 		bodyMarshal(w, response{"success": false, "message": err.Error()})
 		return
 	}

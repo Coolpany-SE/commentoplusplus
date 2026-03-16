@@ -14,6 +14,8 @@ func apiRouterInit(router *mux.Router) error {
 	router.HandleFunc("/api/owner/login", ownerLoginHandler).Methods("POST")
 	router.HandleFunc("/api/owner/self", ownerSelfHandler).Methods("POST")
 	router.HandleFunc("/api/owner/delete", ownerDeleteHandler).Methods("POST")
+	router.HandleFunc("/api/owner/list", ownerListHandler).Methods("POST")
+	router.HandleFunc("/api/owner/update", ownerUpdateHandler).Methods("POST")
 
 	router.HandleFunc("/api/domain/new", domainNewHandler).Methods("POST")
 	router.HandleFunc("/api/domain/delete", domainDeleteHandler).Methods("POST")
@@ -21,6 +23,8 @@ func apiRouterInit(router *mux.Router) error {
 	router.HandleFunc("/api/domain/sso/new", domainSsoSecretNewHandler).Methods("POST")
 	router.HandleFunc("/api/domain/list", domainListHandler).Methods("POST")
 	router.HandleFunc("/api/domain/update", domainUpdateHandler).Methods("POST")
+	router.HandleFunc("/api/domain/owner/add", domainOwnerAddHandler).Methods("POST")
+	router.HandleFunc("/api/domain/owner/remove", domainOwnerRemoveHandler).Methods("POST")
 	router.HandleFunc("/api/domain/moderator/new", domainModeratorNewHandler).Methods("POST")
 	router.HandleFunc("/api/domain/moderator/delete", domainModeratorDeleteHandler).Methods("POST")
 	router.HandleFunc("/api/domain/statistics", domainStatisticsHandler).Methods("POST")

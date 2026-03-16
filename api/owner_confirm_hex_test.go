@@ -8,7 +8,7 @@ import (
 func TestOwnerConfirmHexBasics(t *testing.T) {
 	failTestOnError(t, setupTestEnv())
 
-	ownerHex, _ := ownerNew("test@example.com", "Test", "hunter2")
+	ownerHex, _ := ownerNew("test@example.com", "Test", "hunter2", false)
 
 	statement := `
 		UPDATE owners

@@ -2,7 +2,9 @@ package main
 
 import (
 	"database/sql"
+	"fmt"
 	"net/http"
+	"strings"
 )
 
 func commentList(commenterHex string, domain string, path string, includeUnapproved bool) ([]comment, map[string]commenter, error) {
@@ -323,12 +325,22 @@ func commentListApprovalsHandler(w http.ResponseWriter, r *http.Request) {
 
 }
 
-func commentListAll(domain string) ([]comment, map[string]commenter, error) {
+type CommentListAllOptions struct {
+	IncludeDeleted    bool   `json:"includeDeleted"`
+	IncludeUnapproved bool   `json:"includeUnapproved"`
+	Search            string `json:"search"`
+}
+
+func commentListAll(domain string, pagination *PaginationRequest, options CommentListAllOptions) ([]comment, map[string]commenter, int, error) {
 	if domain == "" {
-		return nil, nil, errorMissingField
+		return nil, nil, 0, errorMissingField
 	}
 
-	statement := `
+	args := []interface{}{domain}
+
+	var query strings.Builder
+
+	query.WriteString(`
 		SELECT
 			path,
 			commentHex,
@@ -341,24 +353,69 @@ func commentListAll(domain string) ([]comment, map[string]commenter, error) {
 			deleted,
 			creationDate
 		FROM comments
-		WHERE
-		canon(comments.domain) LIKE canon($1) AND deleted = false AND 
-			( state = 'approved'  );
-	`
+		WHERE 
+	`)
+
+	var where strings.Builder
+
+	where.WriteString("canon(comments.domain) LIKE canon($1)")
+
+	if !options.IncludeDeleted {
+		where.WriteString("AND deleted = false ")
+	}
+
+	if !options.IncludeUnapproved {
+		where.WriteString("AND ( state = 'approved'  ) ")
+	}
+
+	search := strings.TrimSpace(options.Search)
+
+	if len(search) > 0 {
+		searchArgIndex := fmt.Sprintf("$%d", len(args)+1)
+		where.WriteString(fmt.Sprintf("AND (markdown ILIKE %s OR html ILIKE %s OR path ILIKE %s) ", searchArgIndex, searchArgIndex, searchArgIndex))
+		args = append(args, "%"+search+"%")
+	}
+
+	query.WriteString(where.String())
+
+	// Build count query with the same WHERE clause
+	countQuery := fmt.Sprintf("SELECT COUNT(*) FROM comments WHERE %s", where.String())
+
+	var count int
+	countErr := db.QueryRow(countQuery, args...).Scan(&count)
+	if countErr != nil {
+		logger.Errorf("cannot count comments: %v", countErr)
+		return nil, nil, 0, errorInternal
+	}
+
+	query.WriteString("ORDER BY creationDate DESC ")
+
+	// This needs to be done after the count query, as it adds pagination args to the args slice,
+	// which are not used in the count query and would interfere with it.
+	pagination.PaginateQuery(&query, &args)
+
+	query.WriteString(";")
 
 	var rows *sql.Rows
 	var err error
 
-	rows, err = db.Query(statement, domain)
+	rows, err = db.Query(query.String(), args...)
 
 	if err != nil {
 		logger.Errorf("cannot get comments: %v", err)
-		return nil, nil, errorInternal
+		return nil, nil, 0, errorInternal
 	}
 	defer rows.Close()
 
 	commenters := make(map[string]commenter)
-	commenters["anonymous"] = commenter{CommenterHex: "anonymous", Email: "undefined", Name: "Anonymous", Link: "undefined", Photo: "undefined", Provider: "undefined"}
+	commenters["anonymous"] = commenter{
+		CommenterHex: "anonymous",
+		Email:        "undefined",
+		Name:         "Anonymous",
+		Link:         "undefined",
+		Photo:        "undefined",
+		Provider:     "undefined",
+	}
 
 	comments := []comment{}
 	for rows.Next() {
@@ -374,7 +431,7 @@ func commentListAll(domain string) ([]comment, map[string]commenter, error) {
 			&c.State,
 			&c.Deleted,
 			&c.CreationDate); err != nil {
-			return nil, nil, errorInternal
+			return nil, nil, 0, errorInternal
 		}
 
 		comments = append(comments, c)
@@ -383,12 +440,12 @@ func commentListAll(domain string) ([]comment, map[string]commenter, error) {
 			commenters[c.CommenterHex], err = commenterGetByHex(c.CommenterHex)
 			if err != nil {
 				logger.Errorf("cannot retrieve commenter: %v", err)
-				return nil, nil, errorInternal
+				return nil, nil, 0, errorInternal
 			}
 		}
 	}
 
-	return comments, commenters, nil
+	return comments, commenters, count, nil
 }
 
 func commentListAllHandler(w http.ResponseWriter, r *http.Request) {
@@ -397,8 +454,26 @@ func commentListAllHandler(w http.ResponseWriter, r *http.Request) {
 		Domain     *string `json:"domain"`
 	}
 
+	var body, err = bodyRead(r)
+	if err != nil {
+		bodyMarshal(w, response{"success": false, "message": err.Error()})
+		return
+	}
+
+	pagination, err := CreatePaginationRequestFromBody(body)
+	if err != nil {
+		bodyMarshal(w, response{"success": false, "message": err.Error()})
+		return
+	}
+
+	var options CommentListAllOptions
+	if err := UnmarshalJson(body, &options); err != nil {
+		bodyMarshal(w, response{"success": false, "message": err.Error()})
+		return
+	}
+
 	var x request
-	if err := bodyUnmarshal(r, &x); err != nil {
+	if err := UnmarshalJsonRequired(body, &x); err != nil {
 		bodyMarshal(w, response{"success": false, "message": err.Error()})
 		return
 	}
@@ -421,7 +496,7 @@ func commentListAllHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	comments, commenters, err := commentListAll(domain)
+	comments, commenters, count, err := commentListAll(domain, pagination, options)
 	if err != nil {
 		bodyMarshal(w, response{"success": false, "message": err.Error()})
 		return
@@ -438,6 +513,7 @@ func commentListAllHandler(w http.ResponseWriter, r *http.Request) {
 		"domain":     domain,
 		"comments":   comments,
 		"commenters": _commenters,
+		"pagination": pagination.CreateResponse(&count),
 	})
 
 }
