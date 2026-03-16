@@ -125,4 +125,29 @@
     }
   }
 
+  global.vueSet = function(Vue, target, values) {
+    for (var key in values) {
+      Vue.set(target, key, values[key]);
+    }
+  }
+
+  global.getLocalStorageData = function(key) {
+    var data = localStorage.getItem(key);
+    if (data) {
+      try {
+        return JSON.parse(data);
+      } catch (e) {
+        return null;
+      }
+    }
+  }
+
+  global.setLocalStorageData = function(key, value) {
+    try {
+      localStorage.setItem(key, JSON.stringify(value));
+    } catch (e) {
+      console.error("Error setting localStorage data for key " + key, e);
+    }
+  }
+
 } (window.commento, document));
