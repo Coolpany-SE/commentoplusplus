@@ -158,6 +158,22 @@
     global.allCommentsRefresh();
   };
 
+  // Deletes a comment from the "All comments" tab, then refreshes the list.
+  global.allCommentsDeleteHandler = function(hex) {
+    var json = {
+      "ownerToken": global.cookieGet("commentoOwnerToken"),
+      "commentHex": hex
+    }
+    global.post(global.origin + "/api/comment/owner/delete", json, function(resp) {
+      if (!resp.success) {
+        global.globalErrorShow(resp.message);
+        return;
+      }
+      global._allCommentsKeepPage = true;
+      global.allCommentsRefresh();
+    });
+  }
+
   global.moderatorRemoveComment = function(hex) {
     var data = global.dashboard.$data;
     var indexToRemove = -1;

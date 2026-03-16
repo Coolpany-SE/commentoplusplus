@@ -344,6 +344,7 @@
                         <div class="comment"><strong>User</strong></div>
                         <div class="comment cccc"><strong>Comment</strong></div>
                         <div class="comment"><strong>State</strong></div>
+                        <div class="comment"><strong>Tools</strong></div>
                       </div>
                       <div class="mod-comments-row" v-for="comment in domains[cd].commentsAll">
                         <div class="comment"><a :href="'https://' + domains[cd].domain + comment.url">{{ comment.url }}</a></div>
@@ -351,6 +352,7 @@
                         <div class="comment">{{ domains[cd].commentersAll[comment.commenterHex].name }}</div>
                         <div class="comment cccc"><span v-html="comment.html"></span></div>
                         <div class="comment" style="text-transform: capitalize">{{ comment.deleted ? "deleted" : comment.state }}</div>
+                        <div class="comment"><div class="delete" v-if="!comment.deleted" v-on:click="window.commento.allCommentsDeleteHandler(comment.commentHex)">Delete</button></div>
                       </div>
                     </div>
                     <div style="padding: 12px; color: #888;" v-else>No comments found.</div>
